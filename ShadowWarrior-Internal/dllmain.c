@@ -10,7 +10,6 @@ toggle_health_godmode(bool * status, uintptr_t base)
     *status = !*status;
 
     uintptr_t address = base + 0x12153F + 0x1 + 0x21;
-    uint8_t bytes[4];
 
     if (*status) {
         // patch
@@ -48,6 +47,25 @@ set_all_ammo(struct PLAYERstruct * player_struct)
 }
 
 
+static void
+set_health(int value, struct USER ** users, struct PLAYERstruct * player_struct)
+{
+    // Find the the correct struct USER to matches the player_struct pointer and set the health
+    // Changes when a new level loads
+    // Memory is not zeroed and multiple entries are valid so it's not obvious what the current one is,
+    // so just use every match
+    for (int i = 0; i < 0x4000; ++i) { // _User[0xFFFF]
+        struct USER * user = users[i];
+        if (user == NULL) {
+            continue;
+        }
+        if (user->PlayerP == player_struct) {
+            user->Health = value;
+        }
+    }
+}
+
+
 DWORD WINAPI
 InjectThread(HMODULE hModule)
 {
@@ -72,12 +90,11 @@ InjectThread(HMODULE hModule)
 
     uintptr_t base = trainer_internal_address_module_base();
 
-    //struct USER * user_struct = *(struct USER **)(base + 0x6F1784); // todo: find consistent pointer
-    //struct PLAYERstruct * player_struct = user_struct->PlayerP;
     struct PLAYERstruct * player_struct = *(struct PLAYERstruct **)(base + 0x6EFD04);
+    struct USER ** users = (struct USER *)(base + 0x6f0700);
 
 
-    printf("Press 'End' to exit.\n\n");;
+    printf("Press 'End' to exit.\n\n");
 
     get_keys(player_struct);
     get_weapons(player_struct);
@@ -95,7 +112,7 @@ InjectThread(HMODULE hModule)
            health_status = !health_status;
         }
         if (health_status) {
-            //user_struct->Health = 99;
+            set_health(77, users, player_struct);
         }
 
         // armor
@@ -130,8 +147,8 @@ InjectThread(HMODULE hModule)
         }
 
         // display status
-        printf("\rArmor %3s (%s), Ammo %3s (%s), Get Keys (%s), Get Weapons (%s), God %3s (%s)",
-            //health_status ? "on" : "off", "F1",
+        printf("\rHealth %3s (%s), Armor %3s (%s), Ammo %3s (%s), Get Keys (%s), Get Weapons (%s), God %3s (%s)",
+            health_status ? "on" : "off", "F1",
             armor_status ? "on" : "off", "F2",
             ammo_status ? "on" : "off", "F3",
             "F4",
